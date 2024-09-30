@@ -6,7 +6,8 @@ using Test
 function eq(x::T, y::T) where {T<:Union{values(BenchmarkTools.SUPPORTED_TYPES)...}}
     return all(i -> eq(getfield(x, i), getfield(y, i)), 1:fieldcount(T))
 end
-eq(x::T, y::T) where {T} = isapprox(x, y)
+eq(x::Vector{Float64}, y::Vector{Float64}) = all(eq.(x, y))
+eq(x::T, y::T) where {T} = (x === y) || isapprox(x, y)
 
 function withtempdir(f::Function)
     d = mktempdir()
@@ -113,7 +114,7 @@ end
         [BenchmarkTools.Parameters(5.0, 10000, 1, true, 0.0, true, false, 0.05, 0.01)]
 end
 
-@testset "Inf in Paramters struct" begin
+@testset "Inf in Parameters struct" begin
     params = BenchmarkTools.Parameters(Inf, 10000, 1, false, Inf, true, false, Inf, Inf)
 
     io = IOBuffer()
@@ -122,6 +123,38 @@ end
     json_io = IOBuffer(json_string)
 
     @test BenchmarkTools.load(json_io) == [params]
+end
+
+@testset "NaN in Trial" begin
+    trial1 = BenchmarkTools.Trial(
+        BenchmarkTools.Parameters(), [0.49, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], 2, 1
+    )
+    trial2 = BenchmarkTools.Trial(
+        BenchmarkTools.Parameters(), [0.49, 0.0], [NaN, NaN], [NaN, NaN], [0.0, 0.0], 2, 1
+    )
+
+    io = IOBuffer()
+    BenchmarkTools.save(io, trial1, trial2)
+    json_string = String(take!(io))
+    json_io = IOBuffer(json_string)
+
+    @test BenchmarkTools.load(json_io) == [trial1, trial2]
+end
+
+@testset "NaN in TrialEstimate" begin
+    trial_estimate1 = BenchmarkTools.TrialEstimate(
+        BenchmarkTools.Parameters(), 0.49, 0, 0, 0.0, 2, 1
+    )
+    trial_estimate2 = BenchmarkTools.TrialEstimate(
+        BenchmarkTools.Parameters(), 0.49, NaN, NaN, 0.0, 2, 1
+    )
+
+    io = IOBuffer()
+    BenchmarkTools.save(io, trial_estimate1, trial_estimate2)
+    json_string = String(take!(io))
+    json_io = IOBuffer(json_string)
+
+    @test BenchmarkTools.load(json_io) == [trial_estimate1, trial_estimate2]
 end
 
 end # module

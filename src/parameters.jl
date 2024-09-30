@@ -109,7 +109,11 @@ end
 
 @noinline function overhead_sample(evals)
     start_time = time_ns()
-    for _ in 1:evals
+    try
+        for _ in 1:evals
+            nullfunc()
+        end
+    finally
         nullfunc()
     end
     sample_time = time_ns() - start_time
