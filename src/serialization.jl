@@ -75,7 +75,11 @@ function recover(x::Vector)
                         fields[fn] === nothing ? NaN : convert(ft, fields[fn])
                     end
                 end
-            elseif fn in ("seconds", "overhead", "time_tolerance", "memory_tolerance") &&
+            elseif fn == "instruction_tolerance" && !haskey(fields, fn)
+                DEFAULT_PARAMETERS.instruction_tolerance
+            elseif fn == "branch_tolerance" && !haskey(fields, fn)
+                DEFAULT_PARAMETERS.branch_tolerance
+            elseif fn in ("seconds", "overhead", "time_tolerance", "instruction_tolerance", "branch_tolerance", "memory_tolerance") &&
                 fields[fn] === nothing
                 # JSON spec doesn't support Inf
                 # These fields should all be >= 0, so we can ignore -Inf case

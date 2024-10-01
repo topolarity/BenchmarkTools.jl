@@ -14,10 +14,12 @@ mutable struct Parameters
     gctrial::Bool
     gcsample::Bool
     time_tolerance::Float64
+    instruction_tolerance::Float64
+    branch_tolerance::Float64
     memory_tolerance::Float64
 end
 
-const DEFAULT_PARAMETERS = Parameters(5.0, 10000, 1, false, 0, true, false, 0.05, 0.01)
+const DEFAULT_PARAMETERS = Parameters(5.0, 10000, 1, false, 0, true, false, 0.05, 0.05, 0.05, 0.01)
 
 function Parameters(;
     seconds=DEFAULT_PARAMETERS.seconds,
@@ -28,6 +30,8 @@ function Parameters(;
     gctrial=DEFAULT_PARAMETERS.gctrial,
     gcsample=DEFAULT_PARAMETERS.gcsample,
     time_tolerance=DEFAULT_PARAMETERS.time_tolerance,
+    instruction_tolerance=DEFAULT_PARAMETERS.instruction_tolerance,
+    branch_tolerance=DEFAULT_PARAMETERS.branch_tolerance,
     memory_tolerance=DEFAULT_PARAMETERS.memory_tolerance,
 )
     return Parameters(
@@ -39,6 +43,8 @@ function Parameters(;
         gctrial,
         gcsample,
         time_tolerance,
+        instruction_tolerance,
+        branch_tolerance,
         memory_tolerance,
     )
 end
@@ -52,6 +58,8 @@ function Parameters(
     gctrial=nothing,
     gcsample=nothing,
     time_tolerance=nothing,
+    instruction_tolerance=nothing,
+    branch_tolerance=nothing,
     memory_tolerance=nothing,
 )
     params = Parameters()
@@ -63,6 +71,10 @@ function Parameters(
     params.gcsample = gcsample != nothing ? gcsample : default.gcsample
     params.time_tolerance =
         time_tolerance != nothing ? time_tolerance : default.time_tolerance
+    params.instruction_tolerance =
+        instruction_tolerance != nothing ? instruction_tolerance : default.instruction_tolerance
+    params.branch_tolerance =
+        branch_tolerance != nothing ? branch_tolerance : default.branch_tolerance
     params.memory_tolerance =
         memory_tolerance != nothing ? memory_tolerance : default.memory_tolerance
     return params::BenchmarkTools.Parameters
@@ -76,6 +88,8 @@ function Base.:(==)(a::Parameters, b::Parameters)
            a.gctrial == b.gctrial &&
            a.gcsample == b.gcsample &&
            a.time_tolerance == b.time_tolerance &&
+           a.instruction_tolerance == b.instruction_tolerance &&
+           a.branch_tolerance == b.branch_tolerance &&
            a.memory_tolerance == b.memory_tolerance
 end
 
@@ -89,6 +103,8 @@ function Base.copy(p::Parameters)
         p.gctrial,
         p.gcsample,
         p.time_tolerance,
+        p.instruction_tolerance,
+        p.branch_tolerance,
         p.memory_tolerance,
     )
 end

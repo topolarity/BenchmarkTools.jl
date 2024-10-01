@@ -284,11 +284,21 @@ function ratio(a::TrialEstimate, b::TrialEstimate)
     ttol = max(params(a).time_tolerance, params(b).time_tolerance)
     mtol = max(params(a).memory_tolerance, params(b).memory_tolerance)
     p = Parameters(params(a); time_tolerance=ttol, memory_tolerance=mtol)
+    instruction_ratio = if (instructions(a) === nothing || instructions(b) === nothing)
+        NaN
+    else
+        ratio(instructions(a), instructions(b))
+    end
+    branch_ratio = if (branches(a) === nothing || branches(b) === nothing)
+        NaN
+    else
+        ratio(branches(a), branches(b))
+    end
     return TrialRatio(
         p,
         ratio(time(a), time(b)),
-        ratio(instructions(a), instructions(b)),
-        ratio(branches(a), branches(b)),
+        instruction_ratio,
+        branch_ratio,
         ratio(gctime(a), gctime(b)),
         ratio(memory(a), memory(b)),
         ratio(allocs(a), allocs(b)),
@@ -304,22 +314,28 @@ gcratio(t::TrialEstimate) = ratio(gctime(t), time(t))
 struct TrialJudgement
     ratio::TrialRatio
     time::Symbol
+    instructions::Symbol
+    branches::Symbol
     memory::Symbol
 end
 
 function TrialJudgement(r::TrialRatio)
     ttol = params(r).time_tolerance
+    itol = params(r).instruction_tolerance
+    btol = params(r).branch_tolerance
     mtol = params(r).memory_tolerance
-    return TrialJudgement(r, judge(time(r), ttol), judge(memory(r), mtol))
+    return TrialJudgement(r, judge(time(r), ttol), judge(instructions(r), itol), judge(branches(r), btol), judge(memory(r), mtol))
 end
 
 function Base.:(==)(a::TrialJudgement, b::TrialJudgement)
-    return a.ratio == b.ratio && a.time == b.time && a.memory == b.memory
+    return a.ratio == b.ratio && a.time == b.time && a.instructions == b.instructions && a.branches == b.branches && a.memory == b.memory
 end
 
 Base.copy(t::TrialJudgement) = TrialJudgement(copy(t.params), t.time, t.memory)
 
 Base.time(t::TrialJudgement) = t.time
+instructions(t::TrialJudgement) = t.instructions
+branches(t::TrialJudgement) = t.branches
 memory(t::TrialJudgement) = t.memory
 ratio(t::TrialJudgement) = t.ratio
 params(t::TrialJudgement) = params(ratio(t))
@@ -332,8 +348,12 @@ function judge(r::TrialRatio; kwargs...)
     return TrialJudgement(newr)
 end
 
+judge(ratio::Nothing, tolerance::Float64) = :unknown
+
 function judge(ratio::Real, tolerance::Float64)
-    if isnan(ratio) || (ratio - tolerance) > 1.0
+    if isnan(ratio)
+        return :unknown
+    elseif (ratio - tolerance) > 1.0
         return :regression
     elseif (ratio + tolerance) < 1.0
         return :improvement
@@ -343,20 +363,15 @@ function judge(ratio::Real, tolerance::Float64)
 end
 
 isimprovement(f, t::TrialJudgement) = f(t) == :improvement
-isimprovement(t::TrialJudgement) = isimprovement(time, t) || isimprovement(memory, t)
+isimprovement(t::TrialJudgement) = isimprovement(time, t) || isimprovement(instructions, t) || isimprovement(branches, t) || isimprovement(memory, t)
 
 isregression(f, t::TrialJudgement) = f(t) == :regression
-isregression(t::TrialJudgement) = isregression(time, t) || isregression(memory, t)
+isregression(t::TrialJudgement) = isregression(time, t) || isregression(instructions, t) || isregression(branches, t) || isregression(memory, t)
 
-isinvariant(f, t::TrialJudgement) = f(t) == :invariant
-isinvariant(t::TrialJudgement) = isinvariant(time, t) && isinvariant(memory, t)
+isinvariant(f, t::TrialJudgement) = f(t) == :invariant || f(t) == :unknown
+isinvariant(t::TrialJudgement) = isinvariant(time, t) && isinvariant(instructions, t) && isinvariant(branches, t) && isinvariant(memory, t)
 
-const colormap = (regression=:red, improvement=:green, invariant=:normal)
-
-printtimejudge(io, t::TrialJudgement) = printstyled(io, time(t); color=colormap[time(t)])
-function printmemoryjudge(io, t::TrialJudgement)
-    return printstyled(io, memory(t); color=colormap[memory(t)])
-end
+const colormap = (regression=:red, improvement=:green, invariant=:normal, unknown=:gray)
 
 ###################
 # Pretty Printing #
@@ -461,7 +476,7 @@ Base.summary(io::IO, t::TrialRatio) = _summary(io, t, prettypercent(time(t)))
 Base.summary(io::IO, t::TrialJudgement) =
     withtypename(io, t) do
         print(io, prettydiff(time(ratio(t))), " => ")
-        printtimejudge(io, t)
+        printstyled(io, time(t); color=colormap[time(t)])
     end
 
 _show(io, t) =
@@ -730,10 +745,20 @@ end
 function Base.show(io::IO, ::MIME"text/plain", t::TrialJudgement)
     println(io, "BenchmarkTools.TrialJudgement: ")
     pad = get(io, :pad, "")
-    print(io, pad, "  time:   ", prettydiff(time(ratio(t))), " => ")
-    printtimejudge(io, t)
+    print(io, pad, "  time:         ", prettydiff(time(ratio(t))), " => ")
+    printstyled(io, time(t); color=colormap[time(t)])
     println(io, " (", prettypercent(params(t).time_tolerance), " tolerance)")
-    print(io, pad, "  memory: ", prettydiff(memory(ratio(t))), " => ")
-    printmemoryjudge(io, t)
+    if instructions(t) !== :unknown
+        print(io, pad, "  instructions: ", prettydiff(instructions(ratio(t))), " => ")
+        printstyled(io, instructions(t); color=colormap[instructions(t)])
+        println(io, " (", prettypercent(params(t).instruction_tolerance), " tolerance)")
+    end
+    if branches(t) !== :unknown
+        print(io, pad, "  branches:     ", prettydiff(instructions(ratio(t))), " => ")
+        printstyled(io, branches(t); color=colormap[branches(t)])
+        println(io, " (", prettypercent(params(t).instruction_tolerance), " tolerance)")
+    end
+    print(io, pad, "  memory:       ", prettydiff(memory(ratio(t))), " => ")
+    printstyled(io, memory(t); color=colormap[memory(t)])
     return println(io, " (", prettypercent(params(t).memory_tolerance), " tolerance)")
 end

@@ -147,6 +147,25 @@ tr = ratio(ta, tb)
 @test BenchmarkTools.gcratio(ta) == ratio(gctime(ta), time(ta))
 @test BenchmarkTools.gcratio(tb) == ratio(gctime(tb), time(tb))
 
+ta_nan = BenchmarkTools.TrialEstimate(
+    BenchmarkTools.Parameters(), rand(), NaN, NaN, rand(), rand(Int), rand(Int)
+)
+tb_nan = BenchmarkTools.TrialEstimate(
+    BenchmarkTools.Parameters(), rand(), NaN, NaN, rand(), rand(Int), rand(Int)
+)
+tr_nan = ratio(ta_nan, tb_nan)
+
+@test time(tr_nan) == ratio(time(ta_nan), time(tb_nan))
+@test instructions(tr_nan) == NaN
+@test branches(tr_nan) == NaN
+@test gctime(tr_nan) == ratio(gctime(ta_nan), gctime(tb_nan))
+@test memory(tr_nan) == ratio(memory(ta_nan), memory(tb_nan))
+@test allocs(tr_nan) == ratio(allocs(ta_nan), allocs(tb_nan))
+@test params(tr_nan) == params(ta_nan) == params(tb_nan)
+
+@test BenchmarkTools.gcratio(ta_nan) == ratio(gctime(ta_nan), time(ta_nan))
+@test BenchmarkTools.gcratio(tb_nan) == ratio(gctime(tb_nan), time(tb_nan))
+
 ##################
 # TrialJudgement #
 ##################
