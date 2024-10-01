@@ -571,7 +571,7 @@ function generate_benchmark_definition(
             end
         )
     end
-    ext = Base.get_extension(BenchmarkTools, :BenchmarkToolsLinuxPerfExt)
+    ext = Base.get_extension(BenchmarkTools, :LinuxPerfExt)
     LinuxPerf = isnothing(ext) ? PerfInterface() : ext.interface()
     return Core.eval(
         eval_module,
@@ -612,12 +612,12 @@ function generate_benchmark_definition(
                 __instructions = if (__sample_instructions == -1)
                     NaN
                 else
-                    max((__sample_instructions / __evals) - __params.insts_overhead, 0.0)
+                    max(__sample_instructions / __evals, 0.0)
                 end
                 __branches = if (__sample_branches == -1)
                     NaN
                 else
-                    max((__sample_branches / __evals) - 0.0, 0.0)
+                    max(__sample_branches / __evals, 0.0)
                 end
                 __gctime = max((__gcdiff.total_time / __evals) - __params.overhead, 0.0)
                 __memory = Int(Base.fld(__gcdiff.allocd, __evals))
